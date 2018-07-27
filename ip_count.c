@@ -7,12 +7,19 @@
 #include<pthread.h>
 #include<string.h>
 
-#define MAX_SIZE_OF_BUFFER 10000
+#define MAX_SIZE_OF_BUFFER 10
 #define ALL_ONE 4294967295
-#define UPPER 10000000
+#define UPPER 20
 #define LOWER 1
-#define SESSION_TIME_OUT 1
-#define CLEAN_UP_TIME 5
+#define SESSION_TIME_OUT 2
+#define CLEAN_UP_TIME 2
+#define DISPLAY_TIME 30
+#define FILE_NAME_LENGTH 1000
+#define INPUT_GENERATION_TIME 3
+#define MAX_INPUTS 100
+#define INPUTS_PER_BATCH 10
+
+
 
 //Structure for storing host details
 typedef struct
@@ -53,7 +60,7 @@ void decimal_to_ip(FILE* fp,unsigned int number,int bits_of_subnet);
 void delete_particular_subnet(host** subnet_index_array ,int size, int bits_of_subnet,int* free_index_rear,int* free_index_front,int i);
 void *delete_host(void* var_arg);
 host* insert_in_buffer(unsigned int ip,int* free_ptr,int* free_index_rear,int* free_index_front,int* insert_index);
-
+unsigned int generate_IP();
 
 //Main Function
 int main()
@@ -116,11 +123,12 @@ int main()
 		return 1;			
 	}
 
-        for(int i=0;i<100000;)
+        for(int i=1;i<100000;i++)
         {
              	flag=0;
                 insert_index=-1;
-                ip=(rand() % (UPPER - LOWER + 1)) + LOWER;
+                
+		ip=generate_IP();
                 
                 mask=ALL_ONE;
                 mask=mask<<(32-bits_of_subnet);
@@ -147,7 +155,8 @@ int main()
 		           	{
 		                     	if(node->host_no==ip)
 		                      	{
-		                          	node->count = node->count + 1;
+		                          	printf("COUNT OF IP: %u Increased.\n",ip);
+						node->count = node->count + 1;
 		                          	node->active_time=time(NULL);
 		                                flag=1;
 		                               	break;
@@ -159,6 +168,7 @@ int main()
 		             	{
 		                   	if(node->host_no == ip)
 		                    	{
+						printf("COUNT OF IP: %u Increased.\n",ip);
 		                            	node->count = node->count + 1;
 		                         	node->active_time=time(NULL);
 		                    	}
@@ -180,6 +190,18 @@ int main()
 		else
 		{
 			printf("IP: %u Dropped Because of Locks.\n",ip);
+		
+		}
+
+		if(i%INPUTS_PER_BATCH==0)
+		{
+			printf("%u Packets Encountered.\n",i);
+			sleep(INPUT_GENERATION_TIME);
+		}
+		if(i==MAX_INPUTS)
+		{
+			printf("TOTAL %d INPUTS GENERATED.",i);
+			break;
 		}
         }
 
@@ -192,6 +214,12 @@ int main()
         return 0;
 }
 
+unsigned int generate_IP()
+{
+	unsigned int IP=(rand() % (UPPER - LOWER + 1)) + LOWER;
+	return IP;
+}
+
 void *delete_host(void* var_arg)
 {
 	subnet_details* subnet=(subnet_details*)var_arg;
@@ -200,7 +228,6 @@ void *delete_host(void* var_arg)
 	int bits_of_subnet=subnet->bits_of_subnet;
 	int* free_index_rear=subnet->free_index_rear;
 	int* free_index_front=subnet->free_index_front;	
-	sleep(CLEAN_UP_TIME);
 	
 	while(1)
     	{
@@ -237,17 +264,17 @@ void delete_particular_subnet(host** subnet_index_array ,int size, int bits_of_s
                 	if((time(NULL) - node->active_time) >= SESSION_TIME_OUT )
                         {
                          
-				printf("c= %d==SUBNET INDEX=%d. SESSION TIME OUT OF IP: %u last active at %ld is deleted at %ld.\n",c++,i,node->host_no,node->active_time,time(NULL));
+				printf(".c= %d==SUBNET INDEX=%d. SESSION TIME OUT OF IP: %u last active at %ld is deleted at %ld.\n",c++,i,node->host_no,node->active_time,time(NULL));
 
                        		if(previous_node==NULL)
                                	{
-				   	if((*free_index_front == 0 && *free_index_rear == MAX_SIZE_OF_BUFFER-1) || (*free_index_rear == (*free_index_front-1)%(MAX_SIZE_OF_BUFFER-1)))
+				   	if((*free_index_front == 0 && *free_index_rear == MAX_SIZE_OF_BUFFER-1) || (*free_index_rear == (*free_index_front - 1)%(MAX_SIZE_OF_BUFFER-1)))
 				        {
 				        	printf("Free Store Is Full\n");
 						return;
 				        }
 
-					else if (*free_index_front == -1) /* Insert First Element */
+					else if (*free_index_front == -1) 
 					{
 						*free_index_front = *free_index_rear = 0;			            		
 					}
@@ -283,7 +310,7 @@ void delete_particular_subnet(host** subnet_index_array ,int size, int bits_of_s
                            	}
                                 else
                                	{
-                                    	if((*free_index_front == 0 && *free_index_rear == MAX_SIZE_OF_BUFFER-1) || (*free_index_rear == (*free_index_front-1)%(MAX_SIZE_OF_BUFFER-1)))
+                                    	if((*free_index_front == 0 && *free_index_rear == MAX_SIZE_OF_BUFFER-1) || (*free_index_rear == (*free_index_front - 1)%(MAX_SIZE_OF_BUFFER-1)))
                                        	{
                                         	printf("Free Store Is Full.\n");
 						return;
@@ -312,7 +339,7 @@ void delete_particular_subnet(host** subnet_index_array ,int size, int bits_of_s
 
                                         if(previous_node->next_index!=-1)
                                         {
-                                           	node=&buffer[node->next_index];
+                                           	node=&buffer[previous_node->next_index];
                                         }
                                         else
                                         {
@@ -411,7 +438,7 @@ void *print_fun(void *var_arg)
 		
 		char* current_time_string=ctime(&current_time);
 		char* file_format=".csv";
-		char file_name[1000] = {0};
+		char file_name[FILE_NAME_LENGTH] = {0};
 		
 		snprintf(file_name, sizeof(file_name), "%s%s",current_time_string,file_format);
 		fp=fopen(file_name,"a");
@@ -425,7 +452,7 @@ void *print_fun(void *var_arg)
 		}
 
 		fclose(fp);
-		sleep(60);
+		sleep(DISPLAY_TIME);
     	}
     	
 	return NULL;
@@ -524,7 +551,7 @@ host* insert_in_buffer(unsigned int ip,int* free_ptr,int* free_index_rear,int* f
                 buffer[free_index].next_index=-1;
                 buffer[free_index].active_time=time(NULL);
                 
-		printf("Insertion from free store. IP: %u\n at %d index on %ld time.\n",ip,free_index,buffer[free_index].active_time);
+		printf("Insertion from free store. IP: %u at %d index on %ld time.\n",ip,free_index,buffer[free_index].active_time);
                 
 		host* new_host=&buffer[free_index];
                 *insert_index=free_index;
@@ -555,6 +582,7 @@ unsigned int calc_power(int num,int exp)
 
         return ans;
 }
+
 
 
 
