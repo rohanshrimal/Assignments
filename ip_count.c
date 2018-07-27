@@ -5,6 +5,7 @@
 #include<time.h>
 #include<unistd.h>
 #include<pthread.h>
+#include<string.h>
 
 #define MAX_SIZE_OF_BUFFER 10000
 #define ALL_ONE 4294967295
@@ -29,8 +30,8 @@ typedef struct
         host** subnet_index_array;
         unsigned int size_of_index_array;
         int bits_of_subnet;
-		int* free_index_rear;
-		int* free_index_front;
+	int* free_index_rear;
+	int* free_index_front;
 }subnet_details;
 
 
@@ -46,9 +47,9 @@ pthread_mutex_t* lock_array;
 //Function Prototypes
 unsigned int calc_power(int num,int exp);
 void display_buffer();
-void traverse_subnet_index_array(host** subnet_index_array ,int size, int bits_of_subnet);
+void traverse_subnet_index_array(FILE* fp,host** subnet_index_array ,int size, int bits_of_subnet,int i);
 void *print_fun(void *vargp);
-void decimal_to_ip(unsigned int number,int bits_of_subnet);
+void decimal_to_ip(FILE* fp,unsigned int number,int bits_of_subnet);
 void delete_particular_subnet(host** subnet_index_array ,int size, int bits_of_subnet,int* free_index_rear,int* free_index_front,int i);
 void *delete_host(void* var_arg);
 host* insert_in_buffer(unsigned int ip,int* free_ptr,int* free_index_rear,int* free_index_front,int* insert_index);
@@ -103,8 +104,8 @@ int main()
 	subnet.free_index_rear=&free_index_rear;
 	subnet.free_index_front=&free_index_front;
 
-	//pthread_t thread_id;
-  	//pthread_create(&thread_id, NULL, print_fun, (void*)&subnet);
+	pthread_t print_thread_id;
+  	pthread_create(&print_thread_id, NULL, print_fun, (void*)&subnet);
 
 	pthread_t clean_up_thread_id;
 	int error=pthread_create(&clean_up_thread_id,NULL,delete_host,(void*)&subnet);
@@ -191,7 +192,7 @@ int main()
         return 0;
 }
 
-void *delete_host(void* var_arg)//host** subnet_index_array ,int size, int bits_of_subnet,int* free_index
+void *delete_host(void* var_arg)
 {
 	subnet_details* subnet=(subnet_details*)var_arg;
 	host** subnet_index_array=subnet->subnet_index_array;
@@ -329,7 +330,7 @@ void delete_particular_subnet(host** subnet_index_array ,int size, int bits_of_s
 		if(node!=NULL && ((time(NULL) - node->active_time) >= SESSION_TIME_OUT) )
             	{
 
-          		printf("\nc=%dSUBNET INDEX=%d*******SESSION TIME OUT OF IP: %u last active at %ld is deleted at %ld*******\n",c++,i,node->host_no,node->active_time,time(NULL));
+          		printf("c=%d==SUBNET INDEX=%d. SESSION TIME OUT OF IP: %u last active at %ld is deleted at %ld\n",c++,i,node->host_no,node->active_time,time(NULL));
 
                    	if(previous_node==NULL)
                   	{
@@ -338,7 +339,7 @@ void delete_particular_subnet(host** subnet_index_array ,int size, int bits_of_s
                                		printf("FREE STORE IS FULL.\n");
 					return;
                                 }
-				else if (*free_index_front == -1) /* Insert First Element */
+				else if (*free_index_front == -1) 
 				{
 					*free_index_front = *free_index_rear = 0;			
                                     		
@@ -401,44 +402,60 @@ void delete_particular_subnet(host** subnet_index_array ,int size, int bits_of_s
 void *print_fun(void *var_arg)
 {
         subnet_details* subnet=(subnet_details*)var_arg;
-	int count=1;
-   	
+	FILE* fp=NULL;
+	
 	while(1)
     	{
-		traverse_subnet_index_array(subnet->subnet_index_array ,subnet->size_of_index_array, subnet->bits_of_subnet);
-		sleep(2);
+		time_t current_time;
+		time(&current_time);
+		
+		char* current_time_string=ctime(&current_time);
+		char* file_format=".csv";
+		char file_name[1000] = {0};
+		
+		snprintf(file_name, sizeof(file_name), "%s%s",current_time_string,file_format);
+		fp=fopen(file_name,"a");
+		fprintf(fp,"HOST_NO,COUNT,LAST_ACTIVE_TIME,IP ADDRESS\n");
+
+		for(int i=0; i < subnet->size_of_index_array; i++)
+		{		
+			pthread_mutex_lock(&lock_array[i]);
+			traverse_subnet_index_array(fp,subnet->subnet_index_array ,subnet->size_of_index_array, subnet->bits_of_subnet,i);
+			pthread_mutex_unlock(&lock_array[i]);
+		}
+
+		fclose(fp);
+		sleep(60);
     	}
     	
 	return NULL;
 }
 
-void traverse_subnet_index_array(host** subnet_index_array ,int size, int bits_of_subnet)
+void traverse_subnet_index_array(FILE* fp, host** subnet_index_array ,int size, int bits_of_subnet,int i)
 {
     	int count=0;
     	host* node=NULL;
         
-	for(int i=0;i<size;i++)
+
+        if(subnet_index_array[i] !=NULL)
         {
-        	if(subnet_index_array[i] !=NULL)
-                {
-			node=subnet_index_array[i];
+		node=subnet_index_array[i];
 
-                        while(node->next_index!=-1)
-                        {
-                            printf("{host = %u, count = %d, active time = %ld, ",node->host_no,node->count,node->active_time);
-                         
-			    decimal_to_ip(node->host_no,bits_of_subnet);
-                            node=&buffer[node->next_index];
-                        }
+              	while(node->next_index!=-1)
+               	{
+                  	fprintf(fp,"%u,%d,%ld,",node->host_no,node->count,node->active_time);
+                      	decimal_to_ip(fp,node->host_no,bits_of_subnet);
+                       	node=&buffer[node->next_index];
+            	}
 
-                        printf("{host = %u, count = %d, active time = %ld, ",node->host_no,node->count,node->active_time);
-                        decimal_to_ip(node->host_no,bits_of_subnet);
+            	fprintf(fp,"%u,%d,%ld,",node->host_no,node->count,node->active_time);
+           	decimal_to_ip(fp,node->host_no,bits_of_subnet);
 
-                }
-        }
+       	}
 }
 
-void decimal_to_ip(unsigned int number,int bits_of_subnet)
+
+void decimal_to_ip(FILE* fp,unsigned int number,int bits_of_subnet)
 {
     unsigned int mask=ALL_ONE;
 
@@ -458,7 +475,7 @@ void decimal_to_ip(unsigned int number,int bits_of_subnet)
     second_octet = second_octet >> 16;
     third_octet  = third_octet  >> 8;
 
-    printf("IP = %u.%u.%u.%u }\n",first_octet,second_octet,third_octet,fourth_octet);
+   fprintf(fp,"%u.%u.%u.%u\n",first_octet,second_octet,third_octet,fourth_octet);
 }
 
 host* insert_in_buffer(unsigned int ip,int* free_ptr,int* free_index_rear,int* free_index_front,int* insert_index)
