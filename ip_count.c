@@ -7,19 +7,20 @@
 #include<pthread.h>
 #include<string.h>
 
-#define MAX_SIZE_OF_BUFFER 10
 #define ALL_ONE 4294967295
-#define UPPER 20
-#define LOWER 1
-#define SESSION_TIME_OUT 2
-#define CLEAN_UP_TIME 2
-#define DISPLAY_TIME 30
 #define FILE_NAME_LENGTH 1000
-#define INPUT_GENERATION_TIME 3
-#define MAX_INPUTS 100
-#define INPUTS_PER_BATCH 10
 
-
+int MAX_SIZE_OF_BUFFER=0;
+int UPPER=0;
+int LOWER=0;
+int SESSION_TIME_OUT=0;
+int CLEAN_UP_TIME=0;
+int DISPLAY_TIME=0;
+int INPUT_GENERATION_TIME=0;
+int MAX_INPUTS=0;
+int INPUTS_PER_BATCH=0;
+long start_time=0;
+int thread_exit=1;
 
 //Structure for storing host details
 typedef struct
@@ -43,10 +44,10 @@ typedef struct
 
 
 //Fixed Size Buffer
-host buffer[MAX_SIZE_OF_BUFFER];
+host* buffer;
 
 //Free Memory Storage
-int free_store[MAX_SIZE_OF_BUFFER];
+int* free_store;
 
 //Array of Mutex Locks
 pthread_mutex_t* lock_array;
@@ -61,29 +62,103 @@ void delete_particular_subnet(host** subnet_index_array ,int size, int bits_of_s
 void *delete_host(void* var_arg);
 host* insert_in_buffer(unsigned int ip,int* free_ptr,int* free_index_rear,int* free_index_front,int* insert_index);
 unsigned int generate_IP();
+unsigned generate_seq_IP(unsigned int i);
+
 
 //Main Function
-int main()
+int main(int argc, char** argv)
 {
-	printf("Program Started At: %ld",time(NULL));
-   	printf("\nEnter number of bits for subnet.\n");
+	int test=0;
+
+        if(argc>=2)
+        {
+                if(argv[1][0]=='1')
+                test=1;
+
+                else if(argv[1][0]=='2')
+                test=2;
+
+                else if(argv[1][0]=='3')
+                test=3;
+
+                else if(argv[1][0]=='4')
+                test=4;
+
+                else
+                {
+                        printf("INVALID COMMAND LINE ARGUMENTS\n");
+                        return 1;
+                }
+        }
+
+	start_time=time(NULL);
+	printf("Program Started At: %ld\n",time(NULL) - start_time);
+   	
+	printf("\nEnter number of bits for subnet.\n");
         int bits_of_subnet;
 	scanf("%d",&bits_of_subnet);
+	
+	printf("Enter Buffer Size: ");
+	scanf("%d",&MAX_SIZE_OF_BUFFER);
+	
+	printf("Enter Upper Value: ");
+	scanf("%d",&UPPER);
+
+	printf("Enter Lower Value: ");
+	scanf("%d",&LOWER);
+
+	printf("Enter Session Time Out of Packets: ");
+	scanf("%d",&SESSION_TIME_OUT);
+
+	printf("Enter Clean Up Time: "); 
+	scanf("%d",&CLEAN_UP_TIME);
+
+	printf("Enter Display TIme: ");
+	scanf("%d",&DISPLAY_TIME);
+
+	printf("Enter Input Generation Time: ");
+	scanf("%d",&INPUT_GENERATION_TIME);
+	
+	printf("Enter Number of Iterations (FOR INFINITE ITERATIONS ENTER -1): ");
+	scanf("%d",&MAX_INPUTS);
+	
+	if(MAX_INPUTS == -1)
+	{
+		test=0;
+		MAX_INPUTS=1;
+	}
+
+	printf("Enter Number of Inputs Per Sleep: "); 
+	scanf("%d",&INPUTS_PER_BATCH);
+
 
         if(bits_of_subnet<0 || bits_of_subnet>32)
         {
         	printf("Invalid Bits For Subnet\n"); 
 	 	return 1;
         }
-
+	
+	if(MAX_SIZE_OF_BUFFER<=0 || UPPER<=0 || LOWER<=0 || SESSION_TIME_OUT<=0 || CLEAN_UP_TIME<=0 || DISPLAY_TIME<=0 || INPUT_GENERATION_TIME<=0 || MAX_INPUTS<=0 || INPUTS_PER_BATCH<=0 || LOWER>UPPER)
+	{
+		printf("Invalid Configuration Values\n");
+		return 1;
+	}
+		
         unsigned int size_of_index_array = calc_power(2,bits_of_subnet);
     	host** subnet_index_array=(host**)malloc(size_of_index_array * sizeof(host*));
+
+	host host_buffer[MAX_SIZE_OF_BUFFER];
+	buffer=host_buffer;
+
+	int free_buffer_store[MAX_SIZE_OF_BUFFER];
+	free_store=free_buffer_store;
 
         if(subnet_index_array==NULL)
         {
                 printf("Memory issues");
                 return 1;
         }
+
 
 	pthread_mutex_t lock[size_of_index_array];
 	lock_array=lock;		
@@ -92,16 +167,18 @@ int main()
 	{
 		if (pthread_mutex_init(&lock_array[i], NULL) != 0)
 	    	{
-	        	printf("mutex init has failed\n");
+	        	printf("Mutex init has failed\n");
 	        	return 1;
 	    	}
 	}
+
 
         unsigned int ip=0;
         unsigned int mask=ALL_ONE;
         unsigned int subnet_index=0;
 
-    	int free_ptr=0,flag=0,free_index_rear=-1,free_index_front=-1,insert_index=-1;
+    	int free_ptr=0,flag=0,free_index_rear=-1,free_index_front=-1,insert_index=-1,unhandled_ip=0,dropped_ip=0;
+
     	srand(time(0));
 
         subnet_details subnet;
@@ -123,13 +200,39 @@ int main()
 		return 1;			
 	}
 
-        for(int i=1;i<100000;i++)
+        for(unsigned int i=1;;)
         {
              	flag=0;
                 insert_index=-1;
                 
-		ip=generate_IP();
-                
+		switch(test)
+		{
+			case 0:
+				ip=generate_IP();
+				break;
+
+			case 1:
+				ip=generate_seq_IP(i);
+				break;
+
+			case 2:
+				ip=generate_seq_IP(i);
+				ip=ip + 65536 * ip;
+				break;
+
+			case 3:
+				ip=generate_IP();
+				break;
+
+			case 4:
+				ip=generate_IP();
+				break;
+		
+			default:
+				printf("INVALID CHOICE\n");
+				return 0;
+                }
+
                 mask=ALL_ONE;
                 mask=mask<<(32-bits_of_subnet);
 
@@ -144,7 +247,8 @@ int main()
 
 		            	if(subnet_index_array[subnet_index]==NULL)
 		                {
-		                     	printf("IP: %u NOT PROCESSED.\n",ip);
+					unhandled_ip++;
+		                     	printf("IP: %u NOT PROCESSED. UNHANDLED IP COUNT: %d\n",ip,unhandled_ip);
 		           	}
 		   	}
 		        else
@@ -179,7 +283,8 @@ int main()
 
 		                            else
 		                            {
-		                                printf("IP: %u NOT PROCESSED.\n",ip);
+						unhandled_ip++;
+		                                printf("IP: %u NOT PROCESSED. UNHANDLED IP COUNT: %d\n",ip,unhandled_ip);
 		                            }
 		                    	}
 		              	}
@@ -189,36 +294,80 @@ int main()
 		}
 		else
 		{
-			printf("IP: %u Dropped Because of Locks.\n",ip);
+			dropped_ip++;
+			printf("IP: %u Dropped Because of Locks. Dropped IP Count: %d \n",ip,dropped_ip);
 		
 		}
 
 		if(i%INPUTS_PER_BATCH==0)
 		{
-			printf("%u Packets Encountered.\n",i);
+			printf("%u Packets Encountered Till %ld Seconds.\n",i,time(NULL)-start_time);
 			sleep(INPUT_GENERATION_TIME);
+			
+			if(test==0)
+			{
+				i=0;
+			}
 		}
-		if(i==MAX_INPUTS)
+
+		if(i==MAX_INPUTS && test!=0)
 		{
-			printf("TOTAL %d INPUTS GENERATED.",i);
+			printf("TOTAL %u INPUTS GENERATED IN %ld SECONDS.\n",i,time(NULL)-start_time);
+			printf("TOTAL COUNT OF DROPPED IP's : %d\n",dropped_ip);
+			printf("TOTAL COUNT OF UNHANDLED IP's : %d\n",unhandled_ip);			
 			break;
 		}
-        }
 
-    	free(subnet_index_array);
+		
+		i++;
+		
+        }
+	
+	sleep(CLEAN_UP_TIME);
+    	thread_exit=0;
+	
+	pthread_join(print_thread_id, NULL);
+	pthread_join(clean_up_thread_id, NULL);
+	free(subnet_index_array);
 
 	for(int i=0;i<size_of_index_array;i++)		
 	pthread_mutex_destroy(&lock_array[i]);        
 		
-	printf("Program Terminated At: %ld\n",time(NULL));
+	printf("Program Terminated In: %ld Seconds.",time(NULL)-start_time);
         return 0;
 }
+
 
 unsigned int generate_IP()
 {
 	unsigned int IP=(rand() % (UPPER - LOWER + 1)) + LOWER;
 	return IP;
 }
+
+
+unsigned generate_seq_IP(unsigned int i)
+{
+	if(i>=LOWER && i<=UPPER)
+	{
+		return i;
+	}
+	else 
+	{
+		unsigned ip=(i % (UPPER - LOWER + 1)) + LOWER-1;
+		
+		if (ip>=LOWER)
+		{
+			return ip;		
+		}	
+		else
+		{
+			return UPPER;
+		}
+	}
+}
+
+
+																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																				
 
 void *delete_host(void* var_arg)
 {
@@ -228,10 +377,13 @@ void *delete_host(void* var_arg)
 	int bits_of_subnet=subnet->bits_of_subnet;
 	int* free_index_rear=subnet->free_index_rear;
 	int* free_index_front=subnet->free_index_front;	
+	int count_clean_up=1;
+	sleep(CLEAN_UP_TIME);	
 	
-	while(1)
+	while(thread_exit)
     	{
-	   	for(int i=0;i<size;i++)
+		printf("Clean Up Thread Executing %d Times At %ld seconds.\n",count_clean_up++,time(NULL)-start_time);
+		for(int i=0;i<size;i++)
         	{
 			if(pthread_mutex_trylock(&lock_array[i])==0)
                 	{
@@ -264,13 +416,13 @@ void delete_particular_subnet(host** subnet_index_array ,int size, int bits_of_s
                 	if((time(NULL) - node->active_time) >= SESSION_TIME_OUT )
                         {
                          
-				printf(".c= %d==SUBNET INDEX=%d. SESSION TIME OUT OF IP: %u last active at %ld is deleted at %ld.\n",c++,i,node->host_no,node->active_time,time(NULL));
+				printf(".c= %d==SUBNET INDEX=%d. SESSION TIME OUT OF IP: %u last active at %ld seconds is deleted at %ld seconds.\n",c++,i,node->host_no,node->active_time-start_time,time(NULL)-start_time);
 
                        		if(previous_node==NULL)
                                	{
 				   	if((*free_index_front == 0 && *free_index_rear == MAX_SIZE_OF_BUFFER-1) || (*free_index_rear == (*free_index_front - 1)%(MAX_SIZE_OF_BUFFER-1)))
 				        {
-				        	printf("Free Store Is Full\n");
+				        	printf("Free Store Is Full At %ld seconds\n",time(NULL)-start_time);
 						return;
 				        }
 
@@ -312,7 +464,7 @@ void delete_particular_subnet(host** subnet_index_array ,int size, int bits_of_s
                                	{
                                     	if((*free_index_front == 0 && *free_index_rear == MAX_SIZE_OF_BUFFER-1) || (*free_index_rear == (*free_index_front - 1)%(MAX_SIZE_OF_BUFFER-1)))
                                        	{
-                                        	printf("Free Store Is Full.\n");
+                                        	printf("Free Store Is Full at %ld seconds.\n",time(NULL)-start_time);
 						return;
                                         }
 					else if (*free_index_front == -1) 
@@ -357,13 +509,13 @@ void delete_particular_subnet(host** subnet_index_array ,int size, int bits_of_s
 		if(node!=NULL && ((time(NULL) - node->active_time) >= SESSION_TIME_OUT) )
             	{
 
-          		printf("c=%d==SUBNET INDEX=%d. SESSION TIME OUT OF IP: %u last active at %ld is deleted at %ld\n",c++,i,node->host_no,node->active_time,time(NULL));
+          		printf("c=%d==SUBNET INDEX=%d. SESSION TIME OUT OF IP: %u last active at %ld seconds is deleted at %ld seconds\n",c++,i,node->host_no,node->active_time-start_time,time(NULL)-start_time);
 
                    	if(previous_node==NULL)
                   	{
                          	if((*free_index_front == 0 && *free_index_rear == MAX_SIZE_OF_BUFFER-1) || (*free_index_rear == (*free_index_front-1)%(MAX_SIZE_OF_BUFFER-1)))
                              	{
-                               		printf("FREE STORE IS FULL.\n");
+                               		printf("FREE STORE IS FULL AT %ld SECONDS.\n",time(NULL)-start_time);
 					return;
                                 }
 				else if (*free_index_front == -1) 
@@ -393,7 +545,7 @@ void delete_particular_subnet(host** subnet_index_array ,int size, int bits_of_s
                        	{
                         	if((*free_index_front == 0 && *free_index_rear == MAX_SIZE_OF_BUFFER-1) || (*free_index_rear == (*free_index_front-1)%(MAX_SIZE_OF_BUFFER-1)))
                               	{
-                                    	printf("FREE STORE IS FULL.\n");
+                                    	printf("FREE STORE IS FULL AT %ld SECONDS.\n",time(NULL)-start_time);
 					return;
                                	}
 				else if (*free_index_front == -1) 
@@ -431,7 +583,7 @@ void *print_fun(void *var_arg)
         subnet_details* subnet=(subnet_details*)var_arg;
 	FILE* fp=NULL;
 	
-	while(1)
+	while(thread_exit)
     	{
 		time_t current_time;
 		time(&current_time);
@@ -514,7 +666,7 @@ host* insert_in_buffer(unsigned int ip,int* free_ptr,int* free_index_rear,int* f
                 buffer[*free_ptr].next_index = -1;
                 buffer[*free_ptr].active_time = time(NULL);
                 
-		printf("Sequential insertion done. IP: %u at %d index on %ld time\n",ip,*free_ptr,buffer[*free_ptr].active_time);
+		printf("Sequential insertion done. IP: %u at %d index on %ld seconds.\n",ip,*free_ptr,buffer[*free_ptr].active_time-start_time);
                 
 		host* new_host = &buffer[*free_ptr];
                 *insert_index = *free_ptr;
@@ -526,7 +678,7 @@ host* insert_in_buffer(unsigned int ip,int* free_ptr,int* free_index_rear,int* f
         {
 		if (*free_index_front == -1)
 		{
-			printf("Free Store is Empty.");
+			printf("Free Store is Empty At %ld Seconds.",time(NULL)-start_time);
 			return NULL;
 		}				
 				
@@ -551,7 +703,7 @@ host* insert_in_buffer(unsigned int ip,int* free_ptr,int* free_index_rear,int* f
                 buffer[free_index].next_index=-1;
                 buffer[free_index].active_time=time(NULL);
                 
-		printf("Insertion from free store. IP: %u at %d index on %ld time.\n",ip,free_index,buffer[free_index].active_time);
+		printf("Insertion from free store. IP: %u at %d index on %ld seconds.\n",ip,free_index,buffer[free_index].active_time-start_time);
                 
 		host* new_host=&buffer[free_index];
                 *insert_index=free_index;
