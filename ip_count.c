@@ -1,4 +1,3 @@
-
 //Header Files
 #include<stdio.h>
 #include<stdlib.h>
@@ -9,6 +8,7 @@
 
 #define ALL_ONE 4294967295
 #define FILE_NAME_LENGTH 1000
+#define MAX_STACK_SIZE 10
 
 int MAX_SIZE_OF_BUFFER=0;
 int UPPER=0;
@@ -43,6 +43,13 @@ typedef struct
 }subnet_details;
 
 
+typedef struct 
+{
+   	char key[100];
+    	char value[100];
+}config_parameters;
+
+
 //Fixed Size Buffer
 host* buffer;
 
@@ -63,11 +70,19 @@ void *delete_host(void* var_arg);
 host* insert_in_buffer(unsigned int ip,int* free_ptr,int* free_index_rear,int* free_index_front,int* insert_index);
 unsigned int generate_IP();
 unsigned generate_seq_IP(unsigned int i);
+int push(char* stack,char c,int* tos);
+int read_config();
+char pop(char* stack,int* tos);
 
 
 //Main Function
 int main(int argc, char** argv)
 {
+	if(read_config()==-1)
+	{
+		printf("Error\n");
+	}
+	getc(stdin);
 	int test=0;
 
         if(argc>=2)
@@ -126,6 +141,10 @@ int main(int argc, char** argv)
 	{
 		test=0;
 		MAX_INPUTS=1;
+	}
+	else
+	{
+		test=3;
 	}
 
 	printf("Enter Number of Inputs Per Sleep: "); 
@@ -337,6 +356,237 @@ int main(int argc, char** argv)
         return 0;
 }
 
+
+int read_config()
+{
+	char stack[MAX_STACK_SIZE];
+	config_parameters cp[10]; 
+	char str[1000];
+	int tos=-1,i=0,ptr=-1,j=0,flag=0,is_new_line=1;
+
+	FILE* fp=fopen("config.json","r");
+
+	if(fp==NULL)
+	{
+		printf("ERROR IN OPENING FILE\n");
+		return -1;
+	}
+
+	while(1)
+	{
+		if(is_new_line==1)
+		{
+			if(fgets(str,1000,fp)==NULL)
+			{
+				break;
+			}
+			
+			i=0;
+		}
+
+		while(tos==-1 && str[i]!='{' && str[i]!='\0')
+		{
+			if(str[i]==' ' || str[i]=='\n')
+			{
+				i++;
+			}
+			else
+			{	
+				flag=1;
+				break;
+			}
+		}
+
+		if(tos==-1 && str[i]=='{')
+		{
+			push(stack,'{',&tos);
+			i++;
+		}
+
+		while(tos==0 && str[i]!='"' && str[i]!='\0')
+		{
+			if(str[i]==' ' || str[i]=='\n')
+			{
+				i++;
+			}
+			else
+			{
+				flag=1;
+				break;
+			} 
+		} 
+	
+		if(tos==0 && str[i]=='"')
+		{
+			i++;
+			j=0;
+			
+			push(stack,'"',&tos);
+			ptr=ptr+1;
+			
+			while(str[i]!='"' && str[i]!='\0')
+			{
+				if(str[i]!='\n')
+				{
+					cp[ptr].key[j++]=str[i++];
+				}
+				else if(str[i]=='\n')
+				{
+					flag=1;
+					break;
+				}		
+			}
+			
+			if(str[i]=='"')
+			{
+				cp[ptr].key[j]='\0';
+				i++;
+			}
+		}
+
+		while(tos==1 && str[i]!=':' && str[i]!='\0')
+		{
+			if(str[i]==' ' || str[i]=='\n')
+			{
+				i++;
+			}
+			else
+			{
+				flag=1;
+				break;
+			}
+		}
+
+		if(tos==1 && str[i]==':')
+		{
+			push(stack,':',&tos);
+			i++;
+		}
+
+		while(tos==2 && str[i]!='"' && str[i]!='\0')
+		{
+			if(str[i]==' ' || str[i]=='\n')
+			{
+				i++;
+			}
+			else
+			{	
+				flag=1;
+				break;
+			}
+		}
+
+		if(tos==2 && str[i]=='"')
+		{
+			i++;
+			j=0;
+			push(stack,'"',&tos);
+
+			while(str[i]!='"' && str[i]!='\0')
+			{
+				if(str[i]!='\n')
+				{
+					cp[ptr].value[j++]=str[i++];
+				}
+				else if(str[i]=='\n')
+				{	
+					flag=1;
+					break;
+				}
+			}
+
+			if(str[i]=='"')
+			{
+				cp[ptr].value[j]='\0';
+				i++;
+			}
+		}
+
+		while(tos==3 && str[i]!=',' && str[i]!='}' && str[i]!='\0')
+		{
+			if(str[i]==' ' || str[i]=='\n')
+			{
+				i++;
+			}
+			else
+			{	
+				flag=1;
+				break;
+			}
+		}
+
+		if(tos==3 && (str[i]==',' || str[i]=='}'))
+		{
+			if(pop(stack,&tos)=='"' && pop(stack,&tos)==':' && pop(stack,&tos)=='"')
+			{
+				if(str[i]=='}')
+				{
+					pop(stack,&tos);					
+				}
+
+				is_new_line=0;
+				i++;
+			}
+			else
+			{	
+				flag=1;
+			}
+		}
+
+		if(str[i]=='\0')
+		{
+			is_new_line=1;
+		}
+
+		if(flag==1)
+		{
+			break;
+		}
+	}
+
+	if(flag==1)
+	return -1;
+
+	else
+	{
+		for(int i=0;i<10;i++)
+		{
+			printf("KEY: %s and VALUE: %s\n",cp[i].key,cp[i].value);
+		}
+		return 0;
+	}
+}
+
+int push(char* stack,char c,int* tos)
+{
+	if(*tos == MAX_STACK_SIZE-1)
+	{
+		printf("Stack Is Full\n");
+		return 0;
+	}
+	else
+	{	
+		*tos = *tos + 1;
+		stack[*tos] = c;
+		return 1;
+	}
+	
+}
+
+char pop(char* stack,int* tos)
+{
+	if(*tos==-1)
+	{
+		printf("Stack Is Empty\n");
+		return '\0';
+	}
+	else
+	{
+		char c = stack[*tos];
+		*tos = *tos -1;
+		return c;
+	}
+}
 
 unsigned int generate_IP()
 {
@@ -584,15 +834,12 @@ void *print_fun(void *var_arg)
 	FILE* fp=NULL;
 	
 	while(thread_exit)
-    	{
-		time_t current_time;
-		time(&current_time);
-		
-		char* current_time_string=ctime(&current_time);
+    	{	
+		char* file_start_string="IP_DUMP_AT_";
 		char* file_format=".csv";
 		char file_name[FILE_NAME_LENGTH] = {0};
 		
-		snprintf(file_name, sizeof(file_name), "%s%s",current_time_string,file_format);
+		snprintf(file_name, sizeof(file_name), "%s%ld%s",file_start_string,time(NULL)-start_time,file_format);
 		fp=fopen(file_name,"a");
 		fprintf(fp,"HOST_NO,COUNT,LAST_ACTIVE_TIME,IP ADDRESS\n");
 
@@ -734,7 +981,4 @@ unsigned int calc_power(int num,int exp)
 
         return ans;
 }
-
-
-
 
