@@ -1,1 +1,12 @@
-{ "bits_of_subnet":"56","MAX_SIZE_OF_BUFFER" : "10","UPPER" : "10" ,"LOWER" : "1" ,"SESSION_TIME_OUT" : " 2"  ,"CLEAN_UP_TIME" : "2" ,"DISPLAY_TIME" : "3" ,"INPUT_GENERATION_TIME" : "1" ,"MAX_INPUTS" : "100" ,"INPUTS_PER_BATCH" : "10" }
+{ 
+	"bits_of_subnet"	:	"56",
+	"MAX_SIZE_OF_BUFFER"	:	"10",
+	"UPPER"			:	"10" ,
+	"LOWER" 		:	"1" ,
+	"SESSION_TIME_OUT" 	:	"2"  ,
+	"CLEAN_UP_TIME" 	:	"2" ,
+	"DISPLAY_TIME"		:	"3" ,
+	"INPUT_GENERATION_TIME" :	"1" ,
+	"MAX_INPUTS"		:	"100" ,
+	"INPUTS_PER_BATCH"	:	"10"
+}	

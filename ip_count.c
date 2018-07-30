@@ -386,12 +386,12 @@ int read_config()
 
 		while(tos==-1 && str[i]!='{' && str[i]!='\0')
 		{
-			if(str[i]==' ' || str[i]=='\n')
+			if(str[i]==' ' || str[i]=='\n' || str[i]=='\t')
 			{
 				i++;
 			}
 			else
-			{	
+			{	printf("{\n");
 				flag=1;
 				break;
 			}
@@ -405,12 +405,14 @@ int read_config()
 
 		while(tos==0 && str[i]!='"' && str[i]!='\0')
 		{
-			if(str[i]==' ' || str[i]=='\n')
+			//printf("---%c--- is here..",str[i]);
+			if(str[i]==' ' || str[i]=='\n' || str[i]=='\t')
 			{
+				//printf("finally in if\n");
 				i++;
 			}
 			else
-			{
+			{	//printf("opening key\n");
 				flag=1;
 				break;
 			} 
@@ -431,7 +433,7 @@ int read_config()
 					cp[ptr].key[j++]=str[i++];
 				}
 				else if(str[i]=='\n')
-				{
+				{	//printf("closing key\n");
 					flag=1;
 					break;
 				}		
@@ -446,12 +448,12 @@ int read_config()
 
 		while(tos==1 && str[i]!=':' && str[i]!='\0')
 		{
-			if(str[i]==' ' || str[i]=='\n')
+			if(str[i]==' ' || str[i]=='\n' || str[i]=='\t')
 			{
 				i++;
 			}
 			else
-			{
+			{	//printf("colon\n");
 				flag=1;
 				break;
 			}
@@ -465,12 +467,12 @@ int read_config()
 
 		while(tos==2 && str[i]!='"' && str[i]!='\0')
 		{
-			if(str[i]==' ' || str[i]=='\n')
+			if(str[i]==' ' || str[i]=='\n' || str[i]=='\t')
 			{
 				i++;
 			}
 			else
-			{	
+			{	//printf("opening value\n");
 				flag=1;
 				break;
 			}
@@ -489,7 +491,7 @@ int read_config()
 					cp[ptr].value[j++]=str[i++];
 				}
 				else if(str[i]=='\n')
-				{	
+				{	//printf("closing value\n");
 					flag=1;
 					break;
 				}
@@ -504,12 +506,12 @@ int read_config()
 
 		while(tos==3 && str[i]!=',' && str[i]!='}' && str[i]!='\0')
 		{
-			if(str[i]==' ' || str[i]=='\n')
+			if(str[i]==' ' || str[i]=='\n' || str[i]=='\t')
 			{
 				i++;
 			}
 			else
-			{	
+			{	//printf("comma\n");
 				flag=1;
 				break;
 			}
@@ -528,7 +530,7 @@ int read_config()
 				i++;
 			}
 			else
-			{	
+			{	//printf("ending\n");
 				flag=1;
 			}
 		}
@@ -565,7 +567,7 @@ int push(char* stack,char c,int* tos)
 		return 0;
 	}
 	else
-	{	
+	{	//printf("push %c in stack\n",c);
 		*tos = *tos + 1;
 		stack[*tos] = c;
 		return 1;
@@ -581,7 +583,7 @@ char pop(char* stack,int* tos)
 		return '\0';
 	}
 	else
-	{
+	{	//printf("pop %c from stack\n",stack[*tos]);
 		char c = stack[*tos];
 		*tos = *tos -1;
 		return c;
